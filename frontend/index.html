@@ -1,0 +1,82 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>股票预测系统 - ARIMA-LSTM 混合模型</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="js/echarts.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <h1>股票开盘价预测系统</h1>
+  <span class="subtitle">ARIMA · LSTM · SVR · BP · ARIMA-LSTM 混合模型</span>
+</header>
+
+<div id="error-banner" class="error-banner hidden"></div>
+
+<main class="container">
+  <section class="panel input-panel">
+    <div class="input-row">
+      <label for="stock-code">股票代码</label>
+      <input id="stock-code" type="text" maxlength="6" placeholder="请输入6位A股代码，如 003015" autocomplete="off">
+      <button id="btn-predict" class="btn-primary">开始预测</button>
+      <button id="btn-retrain" class="btn-secondary hidden" title="清除该股票缓存并重新训练">强制重训</button>
+    </div>
+    <div class="input-row">
+      <span class="quick-label">快捷示例：</span>
+      <button class="btn-quick" data-code="003015">003015 日久光电</button>
+      <button class="btn-quick" data-code="600519">600519 贵州茅台</button>
+    </div>
+    <div class="input-row slider-row">
+      <label for="horizon">预测天数</label>
+      <input id="horizon" type="range" min="5" max="60" value="30" step="1">
+      <span id="horizon-value" class="horizon-value">30 天</span>
+      <span id="horizon-warning" class="horizon-warning hidden">⚠ 预测步长越大，误差越大</span>
+    </div>
+    <div id="progress-area" class="progress-area hidden">
+      <div class="progress-text" id="progress-text">准备中…</div>
+      <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+    </div>
+    <div id="status-line" class="status-line"></div>
+  </section>
+
+  <section id="result-area" class="hidden">
+    <section class="panel">
+      <h2>模型测试期指标对比（测试集 20%）</h2>
+      <div class="table-wrap">
+        <table id="metrics-table">
+          <thead>
+            <tr>
+              <th>模型</th><th>MAE</th><th>MSE</th><th>RMSE</th><th>R²</th><th>测试期表现</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>测试期预测对比图</h2>
+      <div id="chart-test" class="chart"></div>
+      <p class="chart-note">真实开盘价 vs 各单一模型 vs ARIMA-LSTM 混合模型（测试集）</p>
+    </section>
+
+    <section class="panel">
+      <h2>未来预测图</h2>
+      <div id="chart-forecast" class="chart"></div>
+      <p class="chart-note" id="forecast-note"></p>
+    </section>
+
+    <section class="panel">
+      <h2>数据说明</h2>
+      <ul id="data-info" class="data-info"></ul>
+    </section>
+  </section>
+
+  <footer class="footer">ARIMA · LSTM · SVR · BP · ARIMA-LSTM 混合模型 · 数据来源：efinance 在线拉取</footer>
+</main>
+
+<script src="js/app.js"></script>
+</body>
+</html>

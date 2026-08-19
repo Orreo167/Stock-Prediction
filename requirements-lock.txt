@@ -1,0 +1,16 @@
+﻿# 精确锁定版本（本机 D:\anacoda Python 3.10.9 实测通过）
+# fastapi/uvicorn 为已实测版本（Python 3.10.9）。
+numpy==1.26.4
+pandas==1.5.3
+scipy==1.10.0
+statsmodels==0.13.5
+pmdarima==2.0.4
+scikit-learn==1.5.2
+tensorflow==2.9.0
+keras==2.9.0
+keras-tuner==1.4.7
+matplotlib==3.7.0
+efinance==0.5.8
+joblib==1.4.2
+fastapi==0.141.1
+uvicorn==0.52.4
