@@ -21,7 +21,7 @@ echo [Python] using: %PY_CMD%
 echo.
 
 REM ---- check & install dependencies ----
-"%PY_CMD%" -c "import fastapi, uvicorn, tensorflow, pmdarima" >nul 2>&1
+"%PY_CMD%" -c "import fastapi, uvicorn, tensorflow, pmdarima, arch" >nul 2>&1
 if errorlevel 1 (
     echo [WARN] dependencies missing, installing...
     "%PY_CMD%" -m pip install -r requirements.txt

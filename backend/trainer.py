@@ -8,6 +8,7 @@ import pandas as pd
 
 import config
 import data_service
+from garch import generate_paths
 from utils import compute_metrics
 from models import MODELS
 
@@ -77,7 +78,10 @@ class Trainer:
         valid = {k: v for k, v in self.metrics.items() if v}
         if not valid:
             raise ValueError("所有模型均训练失败，请稍后重试。")
-        # R² 最高优先，并列取 RMSE 更低
+        # 用户指定：预测固定使用 ARIMA-LSTM 混合模型（ARIMA 主预测 + LSTM 残差，预测带变化）
+        if "ARIMA-LSTM" in self.results:
+            return "ARIMA-LSTM"
+        # 回退：R² 最高优先，并列取 RMSE 更低
         return max(valid, key=lambda k: (valid[k]["R2"], -valid[k]["RMSE"]))
 
     # ---------- 结果组装 ----------
@@ -94,19 +98,34 @@ class Trainer:
 
         best = self._best_model()
         model = self.results[best]
-        fc = forecasts[best]
-        fc = np.round(np.asarray(fc, dtype=float), 3).tolist()
+        fc = np.asarray(forecasts[best], dtype=float)
 
-        # 置信区间：优先用模型自带（ARIMA/混合），否则用测试残差标准差
-        if hasattr(model, "forecast_conf"):
-            lo, hi = model.forecast_conf(horizon)
-            lower = np.round(lo, 3).tolist()
-            upper = np.round(hi, 3).tolist()
-        else:
-            resid = self.test - model.test_pred
-            std = float(np.nanstd(resid))
-            lower = np.round(np.asarray(fc) - 1.96 * std, 3).tolist()
-            upper = np.round(np.asarray(fc) + 1.96 * std, 3).tolist()
+        # 方案3：GARCH 波动率蒙特卡洛路径（中心 = 模型点预测）
+        try:
+            gen = generate_paths(self.df["开盘"].values, fc, horizon)
+            median = np.round(gen["median"], 3).tolist()
+            lower = np.round(gen["q5"], 3).tolist()
+            upper = np.round(gen["q95"], 3).tolist()
+            sample_paths = np.round(
+                gen["paths"][: config.N_PATHS_SHOW], 3).tolist()
+            vol = np.round(gen["sigma"], 6).tolist()
+            path_method = gen["method"]
+        except Exception as exc:
+            print(f"[trainer] GARCH 路径生成失败，回退模型置信区间: {exc}")
+            fc = np.round(fc, 3).tolist()
+            if hasattr(model, "forecast_conf"):
+                lo, hi = model.forecast_conf(horizon)
+                lower = np.round(lo, 3).tolist()
+                upper = np.round(hi, 3).tolist()
+            else:
+                resid = self.test - model.test_pred
+                std = float(np.nanstd(resid))
+                lower = np.round(np.asarray(fc) - 1.96 * std, 3).tolist()
+                upper = np.round(np.asarray(fc) + 1.96 * std, 3).tolist()
+            median = fc
+            sample_paths = []
+            vol = []
+            path_method = "model_conf"
 
         fc_dates = self._next_trading_days(dates[-1], horizon)
 
@@ -134,12 +153,17 @@ class Trainer:
                 "model": best,
                 "horizon": horizon,
                 "dates": fc_dates,
-                "values": fc,
-                "lower": lower,
-                "upper": upper,
+                "values": median,      # 中位数路径（主预测线）
+                "lower": lower,        # 5% 分位
+                "upper": upper,        # 95% 分位
+                "paths": sample_paths, # 抽样灰色路径
+                "vol": vol,            # 每日波动率（小数）
+                "path_method": path_method,
             },
-            "note": f"最优模型：{best}（R² 最高）；历史为真实开盘价；"
-                    f"数据来源：{stock['cache']}",
+            "note": (f"预测模型：{best}（ARIMA 主预测 + LSTM 学习残差）；"
+                     if best == "ARIMA-LSTM" else
+                     f"预测模型：{best}（R² 最高）；")
+                    + f"历史为真实开盘价；数据来源：{stock['cache']}",
         }
 
     def _stock_name(self):
@@ -180,7 +204,8 @@ class Trainer:
         if not os.path.exists(meta_file):
             return False
         try:
-            meta = json.load(open(meta_file, encoding="utf-8"))
+            with open(meta_file, encoding="utf-8") as f:
+                meta = json.load(f)
             if meta.get("fingerprint") != self._cache_fingerprint():
                 print("[trainer] 数据已更新，缓存失效，重新训练")
                 return False
@@ -202,12 +227,13 @@ class Trainer:
         try:
             for name, model in self.results.items():
                 model.save(os.path.join(d, name))
-            json.dump({
-                "fingerprint": self._cache_fingerprint(),
-                "metrics": {k: v for k, v in self.metrics.items() if v},
-                "source": self.source,
-                "warn": self.warn,
-            }, open(os.path.join(d, "meta.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+            with open(os.path.join(d, "meta.json"), "w", encoding="utf-8") as f:
+                json.dump({
+                    "fingerprint": self._cache_fingerprint(),
+                    "metrics": {k: v for k, v in self.metrics.items() if v},
+                    "source": self.source,
+                    "warn": self.warn,
+                }, f, ensure_ascii=False, indent=2)
         except Exception as exc:
             print(f"[trainer] 缓存保存失败（不影响本次结果）: {exc}")
 

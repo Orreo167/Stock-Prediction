@@ -220,7 +220,19 @@
       {
         name: "历史开盘价（近" + histLen + "日）", type: "line", data: histVals,
         lineStyle: { width: 2, color: "#57606a" }, itemStyle: { color: "#57606a" }, symbol: "none", z: 3
-      },
+      }
+    ];
+    // 灰色模拟路径（GARCH 蒙特卡洛，同名合并图例；悬停不干扰）
+    (fc.paths || []).forEach(function (p) {
+      series.push({
+        name: "模拟路径", type: "line", data: pad.concat(p),
+        lineStyle: { width: 1, color: "rgba(87, 96, 106, 0.4)" },
+        itemStyle: { color: "rgba(87, 96, 106, 0.4)" },
+        symbol: "none", z: 2, tooltip: { show: false },
+        emphasis: { disabled: true }, legendHoverLink: false
+      });
+    });
+    series.push(
       {
         name: "置信区间", type: "line", data: fcLower, stack: "conf-band",
         lineStyle: { opacity: 0 }, symbol: "none", z: 1,
@@ -232,7 +244,7 @@
         areaStyle: { color: "rgba(214, 39, 40, 0.28)", opacity: 0.28 }
       },
       {
-        name: "最优模型（" + fc.model + "）未来预测", type: "line", data: fcValues,
+        name: "预测模型（" + fc.model + "）未来预测", type: "line", data: fcValues,
         lineStyle: { width: 3, color: "#d62728" }, itemStyle: { color: "#d62728" }, symbol: "circle", symbolSize: 4, z: 4,
         markLine: {
           silent: true, symbol: "none",
@@ -241,7 +253,7 @@
           data: [{ xAxis: forecastStartIndex }]
         }
       }
-    ];
+    );
 
     chartForecast.setOption({
       tooltip: { trigger: "axis" },
@@ -256,7 +268,10 @@
       series: series
     }, true);
 
-    $forecastNote.textContent = "最优模型：" + fc.model + "（R² 最高）· 预测期 " + fc.dates[0] + " ~ " + fc.dates[fc.dates.length - 1] +
+    var volNote = fc.path_method === "garch" ? "GARCH(1,1) 时变波动率" :
+      (fc.path_method === "fallback" ? "历史波动率（arch 未安装）" : "模型置信区间");
+    $forecastNote.textContent = "预测模型：" + fc.model + " · 预测期 " + fc.dates[0] + " ~ " + fc.dates[fc.dates.length - 1] +
+      " · 波动来源：" + volNote +
       " · 预测区间最高 " + Math.max.apply(null, fc.upper).toFixed(2) + " 元 / 最低 " + Math.min.apply(null, fc.lower).toFixed(2) + " 元";
   }
 

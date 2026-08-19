@@ -43,3 +43,12 @@ TRAIN_SIZE = 0.8
 
 # 模型训练顺序（串行）
 MODEL_ORDER = ["ARIMA", "LSTM", "SVR", "BP", "ARIMA-LSTM"]
+
+# GARCH 蒙特卡洛路径（方案 3：递归点预测中心 + GARCH 波动率 + 随机扰动）
+N_PATHS = 500            # 模拟路径条数
+N_PATHS_SHOW = 20        # 前端展示的灰色样本路径条数
+PATH_SEED = 42           # 随机种子（结果可复现）
+GARCH_P = 1              # GARCH(p, q) 阶数
+GARCH_Q = 1
+GARCH_DIST = "t"         # 扰动分布：学生 t（肥尾，更接近真实收益）
+GARCH_WINDOW_FALLBACK = 60  # arch 不可用时的降级波动窗口（最近 N 天收益率 std）
