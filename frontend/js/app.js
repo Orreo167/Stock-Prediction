@@ -554,7 +554,7 @@
       legend: { top: 0, type: "scroll" },
       grid: { left: 60, right: 20, top: 40, bottom: 50 },
       xAxis: { type: "category", data: data.test.dates, axisLabel: { fontSize: 11 } },
-      yAxis: { type: "value", name: "开盘价（元）", scale: true },
+      yAxis: { type: "value", name: "收盘价（元）", scale: true },
       dataZoom: [
         { type: "inside" },
         { type: "slider", height: 18, bottom: 8, start: 40, end: 100 }
@@ -570,9 +570,9 @@
     } else {
       chartForecast.resize();
     }
-    var histLen = Math.min(60, data.history.open.length);
+    var histLen = Math.min(60, data.history.close.length);
     var histDates = data.history.dates.slice(-histLen);
-    var histVals = data.history.open.slice(-histLen);
+    var histVals = data.history.close.slice(-histLen);
     var fc = data.forecast;
     var forecastStartIndex = histDates.length;
 
@@ -591,7 +591,7 @@
 
     var series = [
       {
-        name: "历史开盘价（近" + histLen + "日）", type: "line", data: histVals,
+        name: "历史收盘价（近" + histLen + "日）", type: "line", data: histVals,
         lineStyle: { width: 2, color: "#57606a" }, itemStyle: { color: "#57606a" }, symbol: "none", z: 3
       }
     ];
@@ -651,7 +651,7 @@
         data: histDates.concat(fc.dates),
         axisLabel: { fontSize: 11 }
       },
-      yAxis: { type: "value", name: "开盘价（元）", scale: true },
+      yAxis: { type: "value", name: "收盘价（元）", scale: true },
       series: series
     }, true);
 

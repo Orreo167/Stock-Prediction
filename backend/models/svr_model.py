@@ -1,4 +1,4 @@
-﻿"""SVR 模型：RBF 核 + 前一日开盘价预测次日开盘价，递归预测未来。"""
+﻿"""SVR 模型：RBF 核 + 前一日收盘价预测次日收盘价，递归预测未来。"""
 
 import os
 import numpy as np
@@ -25,7 +25,7 @@ class SvrModel:
         self.train_last = None
 
     def _build_samples(self, series):
-        """X=昨日开盘价, y=今日开盘价（与 notebook 一致）。"""
+        """X=昨日收盘价, y=今日收盘价（与 notebook 一致）。"""
         x = series[:-1].reshape(-1, 1)
         y = series[1:].reshape(-1, 1)
         return x, y
@@ -43,7 +43,7 @@ class SvrModel:
                          epsilon=self.epsilon, gamma=self.gamma)
         self.model.fit(X_train_s, y_train_s.ravel())
 
-        # 测试期：用真实前一日开盘价做单步预测
+        # 测试期：用真实前一日收盘价做单步预测
         prev = np.concatenate([[self.train_last], test[:-1]]).reshape(-1, 1)
         prev_s = self.scaler_x.transform(prev)
         pred_s = self.model.predict(prev_s)

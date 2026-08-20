@@ -113,12 +113,12 @@ def _normalize(df):
     df = df.copy()
     df.columns = [str(c).strip() for c in df.columns]
     date_col = next((c for c in df.columns if "日期" in c or c.lower() == "date"), None)
-    price_col = "开盘" if "开盘" in df.columns else None
+    price_col = "收盘" if "收盘" in df.columns else None
     if date_col is None or price_col is None:
-        raise ValueError("数据缺少日期或开盘列")
-    df = df[[date_col, price_col]].rename(columns={date_col: "日期", price_col: "开盘"})
+        raise ValueError("数据缺少日期或收盘列")
+    df = df[[date_col, price_col]].rename(columns={date_col: "日期", price_col: "收盘"})
     df["日期"] = pd.to_datetime(df["日期"], errors="coerce")
-    df["开盘"] = pd.to_numeric(df["开盘"], errors="coerce")
+    df["收盘"] = pd.to_numeric(df["收盘"], errors="coerce")
     df = df.dropna().drop_duplicates(subset=["日期"]).sort_values("日期").reset_index(drop=True)
     return df
 
@@ -194,9 +194,9 @@ def _fetch_tencent(code):
     df = pd.DataFrame([r for _, r in items]).iloc[:, :6]
     df.columns = ["日期", "开盘", "收盘", "最高", "最低", "成交量"]
     df["日期"] = pd.to_datetime(df["日期"], errors="coerce")
-    df["开盘"] = pd.to_numeric(df["开盘"], errors="coerce")
-    df = df.dropna(subset=["日期", "开盘"]).reset_index(drop=True)
-    df = df[["日期", "开盘"]].copy()
+    df["收盘"] = pd.to_numeric(df["收盘"], errors="coerce")
+    df = df.dropna(subset=["日期", "收盘"]).reset_index(drop=True)
+    df = df[["日期", "收盘"]].copy()
     df.insert(0, "股票名称", name)
     df.insert(1, "股票代码", code)
     return df
@@ -228,9 +228,9 @@ def _fetch_sina(code):
         pass
     df = pd.DataFrame(rows)
     df["日期"] = pd.to_datetime(df["day"], errors="coerce")
-    df["开盘"] = pd.to_numeric(df["open"], errors="coerce")
-    df = df.dropna(subset=["日期", "开盘"]).reset_index(drop=True)
-    df = df[["日期", "开盘"]].copy()
+    df["收盘"] = pd.to_numeric(df["close"], errors="coerce")
+    df = df.dropna(subset=["日期", "收盘"]).reset_index(drop=True)
+    df = df[["日期", "收盘"]].copy()
     df.insert(0, "股票名称", name)
     df.insert(1, "股票代码", code)
     return df
@@ -255,14 +255,14 @@ def _fetch_netease(code):
     df = pd.read_csv(io.StringIO(resp.text))
     if df is None or len(df) == 0:
         raise ValueError("网易接口未返回数据")
-    if "日期" not in df.columns or "开盘价" not in df.columns:
+    if "日期" not in df.columns or "收盘价" not in df.columns:
         raise ValueError(f"网易接口返回格式异常：{list(df.columns)[:8]}")
     name = str(df["名称"].dropna().iloc[0]) if "名称" in df.columns else ""
     df["日期"] = pd.to_datetime(df["日期"], errors="coerce")
-    df["开盘"] = pd.to_numeric(df["开盘价"], errors="coerce")
-    df = df.dropna(subset=["日期", "开盘"])
+    df["收盘"] = pd.to_numeric(df["收盘价"], errors="coerce")
+    df = df.dropna(subset=["日期", "收盘"])
     df = df.sort_values("日期").reset_index(drop=True)  # 网易返回倒序，转正序
-    df = df[["日期", "开盘"]].copy()
+    df = df[["日期", "收盘"]].copy()
     df.insert(0, "股票名称", name)
     df.insert(1, "股票代码", code)
     return df
@@ -278,11 +278,11 @@ def _fetch_efinance(code):
 
 
 def get_stock_data(code, max_rows=None):
-    """获取指定股票的日K线（开盘价），返回 (df, source, warn)。
+    """获取指定股票的日K线（收盘价），返回 (df, source, warn)。
 
     策略：本地缓存新鲜则直接用；过期则尝试在线刷新（东财直连/efinance）；
     在线失败才回退旧缓存/示例数据，并提示数据可能滞后。
-    df 列：日期/开盘；source：'eastmoney' | 'efinance' | 'local' | 'sample'；
+    df 列：日期/收盘；source：'eastmoney' | 'efinance' | 'local' | 'sample'；
     warn：数据滞后或不足时的提示字符串（可为空）。
     """
     code = str(code).strip()

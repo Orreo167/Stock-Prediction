@@ -53,7 +53,7 @@ def _fallback_sigma(returns, horizon):
 def generate_paths(prices, center, horizon, n_paths=None, seed=None):
     """生成未来 horizon 天模拟路径。
 
-    prices : 历史开盘价序列（拟合 GARCH 波动率）
+    prices : 历史收盘价序列（拟合 GARCH 波动率）
     center : 模型点预测（绝对价格，长度必须等于 horizon）
     返回 dict: paths/median/q5/q95/sigma/method
     """

@@ -70,6 +70,7 @@ class Trainer:
     def _options_signature(self):
         """训练相关参数签名（GARCH 种子不影响训练产物，不参与缓存指纹）。"""
         return {
+            "target": "close",
             "max_rows": self.max_rows,
             "train_ratio": round(self.train_ratio, 4),
             "models": sorted(self.enabled_models),
@@ -99,8 +100,8 @@ class Trainer:
                      f"{config.MIN_ROWS_OK} 天，结果仅供参考")
             self.warn = "；".join(x for x in [self.warn, extra] if x)
         split = int(n * self.train_ratio)
-        self.train = self.df["开盘"].values[:split]
-        self.test = self.df["开盘"].values[split:]
+        self.train = self.df["收盘"].values[:split]
+        self.test = self.df["收盘"].values[split:]
         self.test_actual = self.test
         self._progress("数据", 0.1, f"共 {n} 个交易日（训练 {len(self.train)} / 测试 {len(self.test)}）")
 
@@ -152,7 +153,7 @@ class Trainer:
     # ---------- 结果组装 ----------
     def _build_result(self, horizon, forecasts):
         dates = self.df["日期"].dt.strftime("%Y-%m-%d").tolist()
-        opens = self.df["开盘"].round(3).tolist()
+        closes = self.df["收盘"].round(3).tolist()
         n_train = len(self.train)
         test_dates = dates[n_train:]
         test_actual = np.round(self.test_actual, 3).tolist()
@@ -168,7 +169,7 @@ class Trainer:
         # 方案3：GARCH 波动率蒙特卡洛路径（中心 = 模型点预测）
         try:
             gen = generate_paths(
-                self.df["开盘"].values, fc, horizon, seed=self.garch_seed)
+                self.df["收盘"].values, fc, horizon, seed=self.garch_seed)
             median = np.round(gen["median"], 3).tolist()
             lower = np.round(gen["q5"], 3).tolist()
             upper = np.round(gen["q95"], 3).tolist()
@@ -212,7 +213,7 @@ class Trainer:
 
         return {
             "stock": stock,
-            "history": {"dates": dates, "open": opens},
+            "history": {"dates": dates, "close": closes},
             "test": {"dates": test_dates, "actual": test_actual, "models": test_models},
             "metrics": {k: (v or None) for k, v in self.metrics.items()},
             "forecast": {
@@ -226,7 +227,7 @@ class Trainer:
                 "vol": vol,            # 每日波动率（小数）
                 "path_method": path_method,
             },
-            "note": f"预测模型：{best}（测试期 R² 最高，并列时 RMSE 更低）；历史为真实开盘价",
+            "note": f"预测模型：{best}（测试期 R² 最高，并列时 RMSE 更低）；历史为真实收盘价",
         }
 
     def _stock_name(self):
