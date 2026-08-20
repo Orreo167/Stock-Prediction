@@ -277,7 +277,7 @@ def _fetch_efinance(code):
     return raw
 
 
-def get_stock_data(code):
+def get_stock_data(code, max_rows=None):
     """获取指定股票的日K线（开盘价），返回 (df, source, warn)。
 
     策略：本地缓存新鲜则直接用；过期则尝试在线刷新（东财直连/efinance）；
@@ -286,6 +286,7 @@ def get_stock_data(code):
     warn：数据滞后或不足时的提示字符串（可为空）。
     """
     code = str(code).strip()
+    max_rows = config.MAX_ROWS if max_rows is None else int(max_rows)
     _errors = []
     with _lock:
         local_file = os.path.join(config.DATA_DIR, f"{code}.csv")
@@ -311,8 +312,8 @@ def get_stock_data(code):
                 if raw is not None and len(raw) > 0:
                     # 保存完整原始数据（含股票名称/股票代码列）到本地缓存
                     save_df = raw.copy()
-                    if len(save_df) > config.MAX_ROWS:
-                        save_df = save_df.iloc[-config.MAX_ROWS:].reset_index(drop=True)
+                    if len(save_df) > max_rows:
+                        save_df = save_df.iloc[-max_rows:].reset_index(drop=True)
                     os.makedirs(config.DATA_DIR, exist_ok=True)
                     save_df.to_csv(local_file, index=False, encoding="utf-8")
                     df = _normalize(save_df)

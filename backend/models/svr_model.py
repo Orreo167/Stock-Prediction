@@ -12,7 +12,11 @@ import config
 class SvrModel:
     name = "SVR"
 
-    def __init__(self):
+    def __init__(self, params=None):
+        params = params or {}
+        self.c = float(params.get("C", config.SVR_C))
+        self.epsilon = float(params.get("epsilon", config.SVR_EPSILON))
+        self.gamma = params.get("gamma", config.SVR_GAMMA)
         self.scaler_x = StandardScaler()
         self.scaler_y = StandardScaler()
         self.model = None
@@ -35,8 +39,8 @@ class SvrModel:
         X_train_s = self.scaler_x.fit_transform(X_train)
         y_train_s = self.scaler_y.fit_transform(y_train)
 
-        self.model = SVR(kernel="rbf", C=config.SVR_C,
-                         epsilon=config.SVR_EPSILON, gamma=config.SVR_GAMMA)
+        self.model = SVR(kernel="rbf", C=self.c,
+                         epsilon=self.epsilon, gamma=self.gamma)
         self.model.fit(X_train_s, y_train_s.ravel())
 
         # 测试期：用真实前一日开盘价做单步预测

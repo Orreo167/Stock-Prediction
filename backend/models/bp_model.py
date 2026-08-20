@@ -15,10 +15,15 @@ from utils import create_dataset, sliding_predict_1d, recursive_forecast_1d
 class BpModel:
     name = "BP"
 
-    def __init__(self):
+    def __init__(self, params=None):
+        params = params or {}
+        self.time_step = int(params.get("time_step", config.BP_TIME_STEP))
+        self.units_1 = int(params.get("units_1", config.BP_UNITS_1))
+        self.units_2 = int(params.get("units_2", config.BP_UNITS_2))
+        self.epochs = int(params.get("epochs", config.BP_EPOCHS))
+        self.batch = int(params.get("batch", config.BP_BATCH))
         self.scaler = MinMaxScaler(feature_range=(0, 1))
         self.model = None
-        self.time_step = config.BP_TIME_STEP
         self.test_pred = None
         self.future_pred = None
         self.full_series = None
@@ -35,13 +40,13 @@ class BpModel:
 
         tf.keras.backend.clear_session()
         model = Sequential([
-            Dense(units=config.BP_UNITS_1, input_dim=self.time_step, activation="relu"),
-            Dense(units=config.BP_UNITS_2, activation="relu"),
+            Dense(units=self.units_1, input_dim=self.time_step, activation="relu"),
+            Dense(units=self.units_2, activation="relu"),
             Dense(units=1),
         ])
         model.compile(optimizer="adam", loss="mean_squared_error")
-        model.fit(X_train, y_train, epochs=config.BP_EPOCHS,
-                  batch_size=config.BP_BATCH, verbose=0)
+        model.fit(X_train, y_train, epochs=self.epochs,
+                  batch_size=self.batch, verbose=0)
         self.model = model
 
         test_pred_scaled = sliding_predict_1d(model, full_scaled, self.time_step)

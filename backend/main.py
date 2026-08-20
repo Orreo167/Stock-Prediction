@@ -32,15 +32,17 @@ class PredictRequest(BaseModel):
     code: str
     horizon: int = config.FORECAST_HORIZON_DEFAULT
     force_retrain: bool = False
+    options: dict = None
 
 
 class _JobRunner(threading.Thread):
-    def __init__(self, job_id, code, horizon, force_retrain):
+    def __init__(self, job_id, code, horizon, force_retrain, options=None):
         super().__init__(daemon=True)
         self.job_id = job_id
         self.code = code
         self.horizon = horizon
         self.force_retrain = force_retrain
+        self.options = options or {}
 
     def run(self):
         def progress_cb(stage, pct, detail):
@@ -55,6 +57,7 @@ class _JobRunner(threading.Thread):
                 self.code, self.horizon,
                 progress_cb=progress_cb,
                 force_retrain=self.force_retrain,
+                options=self.options,
             )
             with JOBS_LOCK:
                 JOBS[self.job_id].update(status="done", pct=100, result=result)
@@ -83,7 +86,8 @@ def start_predict(req: PredictRequest):
             "detail": "任务已创建", "result": None, "error": None,
             "created_at": time.time(),
         }
-    _JobRunner(job_id, code, horizon, req.force_retrain).start()
+    _JobRunner(job_id, code, horizon, req.force_retrain,
+               options=req.options).start()
     return {"job_id": job_id}
 
 

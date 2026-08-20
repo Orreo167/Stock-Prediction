@@ -25,6 +25,56 @@ class Trainer:
         self.results = {}      # model_name -> fitted model
         self.metrics = {}      # model_name -> dict
         self.test_actual = None
+        self.max_rows = config.MAX_ROWS
+        self.train_ratio = config.TRAIN_SIZE
+        self.enabled_models = list(config.MODEL_ORDER)
+        self.model_params = {}
+        self.garch_seed = config.PATH_SEED
+
+    # ---------- 高级参数 ----------
+    def _parse_options(self, options):
+        options = options or {}
+        self.max_rows = int(options.get("max_rows", config.MAX_ROWS))
+        self.max_rows = max(config.MAX_ROWS_MIN,
+                            min(config.MAX_ROWS_MAX, self.max_rows))
+        self.train_ratio = float(options.get("train_ratio", config.TRAIN_SIZE))
+        self.train_ratio = max(config.TRAIN_SIZE_MIN,
+                               min(config.TRAIN_SIZE_MAX, self.train_ratio))
+        enabled = options.get("models")
+        if isinstance(enabled, list):
+            self.enabled_models = [m for m in config.MODEL_ORDER if m in enabled]
+        else:
+            self.enabled_models = list(config.MODEL_ORDER)
+        if not self.enabled_models:
+            raise ValueError("至少需要启用一个模型")
+        raw_params = options.get("params") or {}
+        self.model_params = {}
+        for name in config.MODEL_ORDER:
+            p = dict(config.MODEL_PARAM_DEFAULTS.get(name, {}))
+            given = raw_params.get(name) or {}
+            limits = config.MODEL_PARAM_LIMITS.get(name, {})
+            for k, default_v in p.items():
+                v = given.get(k, default_v)
+                lim = limits.get(k)
+                if lim is not None:
+                    try:
+                        f = float(v)
+                        f = max(lim[0], min(lim[1], f))
+                        v = int(round(f)) if isinstance(default_v, int) else float(f)
+                    except (TypeError, ValueError):
+                        v = default_v
+                p[k] = v
+            self.model_params[name] = p
+        self.garch_seed = int(options.get("garch_seed", config.PATH_SEED))
+
+    def _options_signature(self):
+        """训练相关参数签名（GARCH 种子不影响训练产物，不参与缓存指纹）。"""
+        return {
+            "max_rows": self.max_rows,
+            "train_ratio": round(self.train_ratio, 4),
+            "models": sorted(self.enabled_models),
+            "params": {k: self.model_params[k] for k in sorted(self.model_params)},
+        }
 
     # ---------- 进度 ----------
     def _progress(self, stage, pct, detail=""):
@@ -34,13 +84,21 @@ class Trainer:
     def _load_data(self, code):
         self.code = str(code).strip()
         self._progress("数据", 0.05, f"拉取股票 {self.code} 日K线…")
-        self.df, self.source, self.warn = data_service.get_stock_data(self.code)
+        self.df, self.source, self.warn = data_service.get_stock_data(
+            self.code, max_rows=self.max_rows)
         n = len(self.df)
         if n < config.MIN_ROWS_WARN:
             raise ValueError(
                 f"股票 {self.code} 数据仅 {n} 个交易日，少于最低要求 "
                 f"{config.MIN_ROWS_WARN} 天，拒绝训练。")
-        split = int(n * config.TRAIN_SIZE)
+        # 强制截取最近 max_rows 个交易日（旧缓存等路径的兜底）
+        self.df = self.df.iloc[-self.max_rows:].reset_index(drop=True)
+        n = len(self.df)
+        if n < config.MIN_ROWS_OK:
+            extra = (f"数据仅 {n} 个交易日，少于推荐的 "
+                     f"{config.MIN_ROWS_OK} 天，结果仅供参考")
+            self.warn = "；".join(x for x in [self.warn, extra] if x)
+        split = int(n * self.train_ratio)
         self.train = self.df["开盘"].values[:split]
         self.test = self.df["开盘"].values[split:]
         self.test_actual = self.test
@@ -48,12 +106,12 @@ class Trainer:
 
     # ---------- 训练 ----------
     def _train_all(self):
-        order = config.MODEL_ORDER
+        order = self.enabled_models
         total = len(order)
         for i, name in enumerate(order):
             try:
                 self._progress(name, (i + 0.3) / total, f"正在训练 {name}…")
-                model = MODELS[name]()
+                model = MODELS[name](self.model_params.get(name))
                 model.fit(self.train, self.test)
                 self.results[name] = model
                 self.metrics[name] = compute_metrics(self.test, model.test_pred)
@@ -78,11 +136,18 @@ class Trainer:
         valid = {k: v for k, v in self.metrics.items() if v}
         if not valid:
             raise ValueError("所有模型均训练失败，请稍后重试。")
-        # 用户指定：预测固定使用 ARIMA-LSTM 混合模型（ARIMA 主预测 + LSTM 残差，预测带变化）
-        if "ARIMA-LSTM" in self.results:
-            return "ARIMA-LSTM"
-        # 回退：R² 最高优先，并列取 RMSE 更低
-        return max(valid, key=lambda k: (valid[k]["R2"], -valid[k]["RMSE"]))
+        # 按测试期指标选最优：R² 最高优先，并列取 RMSE 更低
+        r2_valid = {
+            k: v for k, v in valid.items()
+            if np.isfinite(v.get("R2", np.nan))
+        }
+        if r2_valid:
+            return max(
+                r2_valid,
+                key=lambda k: (r2_valid[k]["R2"], -r2_valid[k]["RMSE"]),
+            )
+        # 极端情况下 R² 均不可用，退化为 RMSE 最低
+        return min(valid, key=lambda k: valid[k]["RMSE"])
 
     # ---------- 结果组装 ----------
     def _build_result(self, horizon, forecasts):
@@ -102,7 +167,8 @@ class Trainer:
 
         # 方案3：GARCH 波动率蒙特卡洛路径（中心 = 模型点预测）
         try:
-            gen = generate_paths(self.df["开盘"].values, fc, horizon)
+            gen = generate_paths(
+                self.df["开盘"].values, fc, horizon, seed=self.garch_seed)
             median = np.round(gen["median"], 3).tolist()
             lower = np.round(gen["q5"], 3).tolist()
             upper = np.round(gen["q95"], 3).tolist()
@@ -160,10 +226,7 @@ class Trainer:
                 "vol": vol,            # 每日波动率（小数）
                 "path_method": path_method,
             },
-            "note": (f"预测模型：{best}（ARIMA 主预测 + LSTM 学习残差）；"
-                     if best == "ARIMA-LSTM" else
-                     f"预测模型：{best}（R² 最高）；")
-                    + f"历史为真实开盘价；数据来源：{stock['cache']}",
+            "note": f"预测模型：{best}（测试期 R² 最高，并列时 RMSE 更低）；历史为真实开盘价",
         }
 
     def _stock_name(self):
@@ -193,9 +256,11 @@ class Trainer:
         return os.path.join(config.CACHE_DIR, str(code).strip())
 
     def _cache_fingerprint(self):
-        """数据指纹：最后交易日 + 样本量，数据变化时缓存自动失效。"""
+        """缓存指纹：最后交易日 + 样本量 + 训练参数，任一变化都会失效。"""
         last = self.df["日期"].iloc[-1].strftime("%Y-%m-%d")
-        return f"{last}|{len(self.df)}"
+        sig = json.dumps(self._options_signature(), sort_keys=True,
+                         ensure_ascii=False)
+        return f"{last}|{len(self.df)}|{sig}"
 
     def _load_cached(self, code):
         """尝试加载已训练模型；成功返回 True。数据指纹不一致时视为失效。"""
@@ -207,9 +272,10 @@ class Trainer:
             with open(meta_file, encoding="utf-8") as f:
                 meta = json.load(f)
             if meta.get("fingerprint") != self._cache_fingerprint():
-                print("[trainer] 数据已更新，缓存失效，重新训练")
+                print("[trainer] 数据或训练参数已变化，缓存失效，重新训练")
                 return False
-            for name, cls in MODELS.items():
+            for name in self.enabled_models:
+                cls = MODELS[name]
                 mdir = os.path.join(d, name)
                 if os.path.isdir(mdir):
                     self.results[name] = cls.load(mdir)
@@ -238,7 +304,8 @@ class Trainer:
             print(f"[trainer] 缓存保存失败（不影响本次结果）: {exc}")
 
     # ---------- 主流程 ----------
-    def run(self, code, horizon, force_retrain=False):
+    def run(self, code, horizon, force_retrain=False, options=None):
+        self._parse_options(options)
         horizon = int(horizon)
         horizon = max(config.FORECAST_HORIZON_MIN,
                       min(config.FORECAST_HORIZON_MAX, horizon))
@@ -254,7 +321,9 @@ class Trainer:
         return result
 
 
-def run_training(code, horizon, progress_cb=None, force_retrain=False):
+def run_training(code, horizon, progress_cb=None, force_retrain=False,
+                 options=None):
     """后台线程入口。"""
     trainer = Trainer(progress_cb=progress_cb)
-    return trainer.run(code, horizon, force_retrain=force_retrain)
+    return trainer.run(code, horizon, force_retrain=force_retrain,
+                       options=options)

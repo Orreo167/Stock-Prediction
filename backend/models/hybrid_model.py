@@ -23,11 +23,18 @@ from utils import create_dataset
 class HybridModel:
     name = "ARIMA-LSTM"
 
-    def __init__(self):
+    def __init__(self, params=None):
+        params = params or {}
+        self.max_p = int(params.get("max_p", config.ARIMA_MAX_P))
+        self.max_q = int(params.get("max_q", config.ARIMA_MAX_Q))
+        self.time_step = int(params.get("time_step", config.LSTM_TIME_STEP))
+        self.units = int(params.get("units", config.LSTM_UNITS))
+        self.dropout = float(params.get("dropout", config.LSTM_DROPOUT))
+        self.epochs = int(params.get("epochs", config.LSTM_EPOCHS))
+        self.batch = int(params.get("batch", config.LSTM_BATCH))
         self.arima = None
         self.resid_scaler = StandardScaler()
         self.resid_model = None
-        self.time_step = config.LSTM_TIME_STEP
         self.test_pred = None
         self.future_pred = None
         self.future_conf = None
@@ -40,7 +47,8 @@ class HybridModel:
         test = np.asarray(test, dtype=float).reshape(-1)
 
         self.arima = pm.auto_arima(
-            train, start_p=1, start_q=1, max_p=10, max_q=10,
+            train, start_p=1, start_q=1,
+            max_p=self.max_p, max_q=self.max_q,
             seasonal=False, information_criterion="aic", trace=False,
             error_action="ignore", suppress_warnings=True, stepwise=True,
             scoring="mse",
@@ -76,14 +84,14 @@ class HybridModel:
 
         tf.keras.backend.clear_session()
         model = Sequential([
-            LSTM(units=config.LSTM_UNITS, return_sequences=False,
+            LSTM(units=self.units, return_sequences=False,
                  input_shape=(self.time_step, 1)),
-            Dropout(config.LSTM_DROPOUT),
+            Dropout(self.dropout),
             Dense(units=1),
         ])
         model.compile(optimizer="rmsprop", loss="mean_squared_error")
-        model.fit(X, y, epochs=config.LSTM_EPOCHS,
-                  batch_size=config.LSTM_BATCH, verbose=0)
+        model.fit(X, y, epochs=self.epochs,
+                  batch_size=self.batch, verbose=0)
         self.resid_model = model
 
     def _forecast_resid(self, start_window, steps):

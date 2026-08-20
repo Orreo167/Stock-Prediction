@@ -17,12 +17,17 @@ LEGACY_SAMPLE_FILE = os.path.join(os.path.dirname(BASE_DIR), "代码", "数据00
 MIN_ROWS_OK = 1300          # 理想下限
 MIN_ROWS_WARN = 500         # 低于此值拒绝训练
 MAX_ROWS = 1500             # 训练最多使用的交易日数（超出截取最近部分，控制训练时间）
+MAX_ROWS_MIN = 1000         # 高级选项中数据天数上限的可调下限
+MAX_ROWS_MAX = 3000         # 高级选项中数据天数上限的可调上限
 CACHE_MAX_AGE_DAYS = 7      # 本地缓存超过 N 天未更新则强制在线刷新
 FORECAST_HORIZON_DEFAULT = 30
 FORECAST_HORIZON_MIN = 5
 FORECAST_HORIZON_MAX = 60
 
 # 训练配置（沿用 notebook 验证过的最优/常用参数）
+ARIMA_MAX_P = 10            # auto_arima 最大 p 阶
+ARIMA_MAX_Q = 10            # auto_arima 最大 q 阶
+
 LSTM_TIME_STEP = 5
 LSTM_UNITS = 48
 LSTM_DROPOUT = 0.1
@@ -40,6 +45,56 @@ SVR_EPSILON = 0.1
 SVR_GAMMA = "scale"
 
 TRAIN_SIZE = 0.8
+TRAIN_SIZE_MIN = 0.5        # 高级选项中训练/测试划分比例的可调下限
+TRAIN_SIZE_MAX = 0.9        # 高级选项中训练/测试划分比例的可调上限
+
+# 高级选项中的模型参数默认值（前端“恢复默认”与此保持一致）
+MODEL_PARAM_DEFAULTS = {
+    "ARIMA": {"max_p": ARIMA_MAX_P, "max_q": ARIMA_MAX_Q},
+    "LSTM": {
+        "time_step": LSTM_TIME_STEP,
+        "units": LSTM_UNITS,
+        "dropout": LSTM_DROPOUT,
+        "epochs": LSTM_EPOCHS,
+        "batch": LSTM_BATCH,
+    },
+    "SVR": {"C": SVR_C, "epsilon": SVR_EPSILON, "gamma": SVR_GAMMA},
+    "BP": {
+        "time_step": BP_TIME_STEP,
+        "units_1": BP_UNITS_1,
+        "units_2": BP_UNITS_2,
+        "epochs": BP_EPOCHS,
+        "batch": BP_BATCH,
+    },
+    "ARIMA-LSTM": {
+        "max_p": ARIMA_MAX_P,
+        "max_q": ARIMA_MAX_Q,
+        "time_step": LSTM_TIME_STEP,
+        "units": LSTM_UNITS,
+        "dropout": LSTM_DROPOUT,
+        "epochs": LSTM_EPOCHS,
+        "batch": LSTM_BATCH,
+    },
+}
+
+# 高级选项中模型参数的可调范围（None 表示不限制，如 SVR gamma 字符串）
+MODEL_PARAM_LIMITS = {
+    "ARIMA": {"max_p": (1, 30), "max_q": (1, 30)},
+    "LSTM": {
+        "time_step": (1, 30), "units": (8, 256), "dropout": (0, 0.5),
+        "epochs": (10, 200), "batch": (8, 128),
+    },
+    "SVR": {"C": (0.1, 1000), "epsilon": (0.01, 1), "gamma": None},
+    "BP": {
+        "time_step": (1, 60), "units_1": (8, 256), "units_2": (4, 128),
+        "epochs": (10, 200), "batch": (8, 128),
+    },
+    "ARIMA-LSTM": {
+        "max_p": (1, 30), "max_q": (1, 30),
+        "time_step": (1, 30), "units": (8, 256), "dropout": (0, 0.5),
+        "epochs": (10, 200), "batch": (8, 128),
+    },
+}
 
 # 模型训练顺序（串行）
 MODEL_ORDER = ["ARIMA", "LSTM", "SVR", "BP", "ARIMA-LSTM"]

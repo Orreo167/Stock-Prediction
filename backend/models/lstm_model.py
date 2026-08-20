@@ -15,10 +15,15 @@ from utils import create_dataset, sliding_predict_1d, recursive_forecast_1d
 class LstmModel:
     name = "LSTM"
 
-    def __init__(self):
+    def __init__(self, params=None):
+        params = params or {}
+        self.time_step = int(params.get("time_step", config.LSTM_TIME_STEP))
+        self.units = int(params.get("units", config.LSTM_UNITS))
+        self.dropout = float(params.get("dropout", config.LSTM_DROPOUT))
+        self.epochs = int(params.get("epochs", config.LSTM_EPOCHS))
+        self.batch = int(params.get("batch", config.LSTM_BATCH))
         self.scaler = StandardScaler()
         self.model = None
-        self.time_step = config.LSTM_TIME_STEP
         self.test_pred = None
         self.future_pred = None
         self.full_series = None
@@ -37,14 +42,14 @@ class LstmModel:
 
         tf.keras.backend.clear_session()
         model = Sequential([
-            LSTM(units=config.LSTM_UNITS, return_sequences=False,
+            LSTM(units=self.units, return_sequences=False,
                  input_shape=(self.time_step, 1)),
-            Dropout(config.LSTM_DROPOUT),
+            Dropout(self.dropout),
             Dense(units=1),
         ])
         model.compile(optimizer="rmsprop", loss="mean_squared_error")
-        model.fit(X_train, y_train, epochs=config.LSTM_EPOCHS,
-                  batch_size=config.LSTM_BATCH, verbose=0)
+        model.fit(X_train, y_train, epochs=self.epochs,
+                  batch_size=self.batch, verbose=0)
         self.model = model
 
         # 测试期预测：在完整序列上滑窗（与测试集日期对齐）

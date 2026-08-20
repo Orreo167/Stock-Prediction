@@ -19,7 +19,10 @@
   <section class="panel input-panel">
     <div class="input-row">
       <label for="stock-code">股票代码</label>
-      <input id="stock-code" type="text" maxlength="6" placeholder="请输入6位A股代码，如 003015" autocomplete="off">
+      <div class="code-field">
+        <input id="stock-code" type="text" maxlength="6" placeholder="请输入6位A股代码，如 003015" autocomplete="off">
+        <div id="history-dropdown" class="history-dropdown hidden"></div>
+      </div>
       <button id="btn-predict" class="btn-primary">开始预测</button>
       <button id="btn-retrain" class="btn-secondary hidden" title="清除该股票缓存并重新训练">强制重训</button>
     </div>
@@ -34,8 +37,24 @@
       <span id="horizon-value" class="horizon-value">30 天</span>
       <span id="horizon-warning" class="horizon-warning hidden">⚠ 预测步长越大，误差越大</span>
     </div>
+    <div class="advanced-wrap">
+      <div class="advanced-head">
+        <button id="btn-advanced" class="btn-secondary btn-advanced" type="button">高级选项</button>
+        <span id="advanced-hint" class="advanced-hint">修改参数可能导致预测效果变差并触发重新训练，推荐使用默认值。</span>
+      </div>
+      <div id="advanced-panel" class="advanced-panel hidden">
+        <div id="advanced-general" class="advanced-general"></div>
+        <div id="advanced-models" class="advanced-models"></div>
+        <div class="advanced-actions">
+          <button id="btn-reset-advanced" class="btn-secondary" type="button">恢复默认</button>
+        </div>
+      </div>
+    </div>
     <div id="progress-area" class="progress-area hidden">
-      <div class="progress-text" id="progress-text">准备中…</div>
+      <div class="progress-head">
+        <span id="progress-spinner" class="spinner hidden"></span>
+        <span id="progress-text">准备中…</span>
+      </div>
       <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
     </div>
     <div id="status-line" class="status-line"></div>
@@ -74,9 +93,19 @@
     </section>
   </section>
 
-  <footer class="footer">ARIMA · LSTM · SVR · BP · ARIMA-LSTM 混合模型 · 数据来源：efinance 在线拉取</footer>
+  <footer class="footer">ARIMA · LSTM · SVR · BP · ARIMA-LSTM 混合模型 · 数据来源：<span id="footer-source">东方财富 · 腾讯 · 新浪 · 网易 · efinance · 本地缓存 · 内置示例数据</span></footer>
 </main>
 
-<script src="js/app.js"></script>
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal-box">
+    <p id="modal-message"></p>
+    <div class="modal-actions">
+      <button id="modal-cancel" class="btn-secondary" type="button">取消</button>
+      <button id="modal-confirm" class="btn-primary" type="button">确认</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js?v=20260820f"></script>
 </body>
 </html>

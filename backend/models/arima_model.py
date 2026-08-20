@@ -11,7 +11,10 @@ import config
 class ArimaModel:
     name = "ARIMA"
 
-    def __init__(self):
+    def __init__(self, params=None):
+        params = params or {}
+        self.max_p = int(params.get("max_p", config.ARIMA_MAX_P))
+        self.max_q = int(params.get("max_q", config.ARIMA_MAX_Q))
         self.model = None
         self.test_pred = None
         self.future_pred = None
@@ -23,7 +26,8 @@ class ArimaModel:
 
         self.model = pm.auto_arima(
             train,
-            start_p=1, start_q=1, max_p=10, max_q=10,
+            start_p=1, start_q=1,
+            max_p=self.max_p, max_q=self.max_q,
             seasonal=False,
             information_criterion="aic",
             trace=False,
