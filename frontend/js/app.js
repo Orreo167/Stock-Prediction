@@ -526,7 +526,31 @@
       });
     }
     chartTest.setOption({
-      tooltip: { trigger: "axis" },
+      tooltip: {
+        trigger: "axis",
+        confine: true,
+        formatter: function (params) {
+          if (!params || !params.length) return "";
+          var bestName = bestModel(data.metrics);
+          var html = '<div style="font-size:12px;color:#6e7781;margin-bottom:4px;">' +
+            params[0].axisValueLabel + "</div>";
+          params.forEach(function (p) {
+            var v = p.value;
+            if (v === null || v === undefined || isNaN(v)) return;
+            var color = p.color || colorsFor(p.seriesName);
+            var boxed = p.seriesName === "实际值" || p.seriesName === bestName;
+            var rowStyle = boxed
+              ? "border:2px solid " + color + ";background:" + color + "1a;" +
+                "border-radius:5px;padding:3px 8px;margin:3px 0;font-weight:600;"
+              : "padding:3px 8px;margin:3px 0;";
+            html += '<div style="display:flex;justify-content:space-between;gap:28px;' + rowStyle + '">' +
+              "<span><span style=\"display:inline-block;width:10px;height:10px;background:" +
+              color + ";border-radius:2px;margin-right:6px;\"></span>" + p.seriesName + "</span>" +
+              "<span><b>" + v + "</b></span></div>";
+          });
+          return html;
+        }
+      },
       legend: { top: 0, type: "scroll" },
       grid: { left: 60, right: 20, top: 40, bottom: 50 },
       xAxis: { type: "category", data: data.test.dates, axisLabel: { fontSize: 11 } },
@@ -670,6 +694,7 @@
   // ---------- 主流程 ----------
   function start(code, horizon, forceRetrain) {
     if (state.busy) return;
+    $advancedPanel.classList.add("hidden");
     clearError();
     var code = validateCode();
     if (!code) return;
@@ -779,9 +804,10 @@
     $advancedPanel.classList.toggle("hidden");
   });
   $btnResetAdvanced.addEventListener("click", function () {
-    if (!confirm("确定恢复所有高级参数为默认值吗？")) return;
-    saveAdvancedOptions(deepClone(ADVANCED_DEFAULTS));
-    buildAdvancedUI();
+    showConfirm("确定恢复所有高级参数为默认值吗？", function () {
+      saveAdvancedOptions(deepClone(ADVANCED_DEFAULTS));
+      buildAdvancedUI();
+    });
   });
   $advancedGeneral.addEventListener("input", function () {
     saveAdvancedOptions(readAdvancedOptions());

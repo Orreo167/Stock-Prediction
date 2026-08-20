@@ -19,6 +19,15 @@ body {
   line-height: 1.6;
 }
 
+.disclaimer {
+  background: #f6f8fa;
+  color: #6e7781;
+  text-align: center;
+  padding: 6px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
 .topbar {
   background: linear-gradient(120deg, #0d2b5e, #1f6feb);
   color: #fff;
@@ -194,7 +203,7 @@ tr.best-row { background: #e8f4ec; font-weight: 600; }
   align-items: center;
   gap: 14px;
 }
-.advanced-hint { color: var(--warn); font-size: 13px; }
+.advanced-hint { color: #e5534b; font-size: 13px; }
 .btn-advanced { font-size: 13px; padding: 6px 14px; }
 .advanced-panel {
   margin-top: 12px;
